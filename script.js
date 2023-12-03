@@ -66,7 +66,7 @@ class cursor{
         this.y = y;
     }
     render(){
-        drawCircle([this.x,this.y],10,"rgba(100,100,100,0.5)");
+        drawCircle([this.x,this.y],10,"rgba(50,50,50,0.7)");
     }
 }
 let wabi = new cursor();
