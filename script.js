@@ -79,16 +79,30 @@ function getMousePosition(){
 }
 
 class tile{
-    x;y;type;isDragged;
+    x;y;type;isDragged;velocityX;velocityY;width
     constructor(x,y,type){
         this.x = x;
         this.y = y;
         this.type = type;
         this.width = 89;
         this.height = 91;
+        this.isDragged = false;
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.width = Math.min(height,width)/10;
+    }
+    update(){
+        this.x += this.velocityX*planc;
+        this.y += this.velocityY*planc;
+        this.velocityX*=(Math.abs(this.velocityX)<2)?0:0.9;
+        this.velocityY*=(Math.abs(this.velocityY)<2)?0:0.9;
+        this.velocityX += (this.x<0)?planc*500:0;
+        this.velocityX -= (this.x>width-this.width)?planc*500:0;
+        this.velocityY += (this.y<0)?planc*500:0;
+        this.velocityY -= (this.y>height-this.width)?planc*500:0;
     }
     render(){
-        draw.drawImage(imageDict[this.type],this.x,this.y);
+        draw.drawImage(imageDict[this.type],this.x,this.y,this.width,this.width);
     }
     bound(locationX,locationY){
         return (locationX>this.x&&locationX<this.x+this.width&&locationY>this.y&&locationY<this.y+this.height)?true:false;
@@ -114,37 +128,49 @@ function release(){
     dragged = [];
 }
 
-//do physics simulation for the tiles pushing each other around, but ignore the one(s) being dragged(isDragged)
+//vector functions
+function magnitude(a){
+    return(Math.sqrt(a[0]*a[0]+a[1]*a[1]));
+}
+function normalize(raw){
+    let mag = magnitude(raw);
+    return [raw[0]/mag,raw[1]/mag];
+}
+function distance(pos1,pos2){
+    return Math.sqrt(Math.abs((pos2[0]-pos1[0])*(pos2[0]-pos1[0])+(pos2[1]-pos1[1])*(pos2[1]-pos1[1])));
+}
+function dotProduct(a,b){
+    return a[0]*b[0]+a[1]*b[1];
+}
+function flattenToB(a,b){
+    let maga = magnitude(a);
+    let magb = magnitude(b);
+    let norm = normalize(b);
+    let mag = maga*(dotProduct(a,b)/(maga*magb));
+    return (maga==0)?[0.0,0.0]:[norm[0]*mag,norm[1]*mag];
+}
+function clamp(x,min,max){
+    return (x>max)?max:(x<min)?min:x;
+}
+
 function collision(tileA,tileB){
     let dist = distance([tileA.x,tileA.y],[tileB.x,tileB.y]);
-    let coll = ((dist-tileA.radius-tileB.radius)>0)?0:1;
+    let coll = ((dist-tileA.width)>0)?0:1;
     if(coll==1){
         let vec = [tileA.x-tileB.x,tileA.y-tileB.y];
         let normal = normalize(vec);//you need that funciton
-        let relativeVela = flattenToB([tileA.velocityX,tileA.velocityY],vec);//you also need this function
-        let relativeVelb = flattenToB([tileB.velocityX,tileB.velocityY],vec);
-        //well screw this part, no momentum baing passed around, just each push the other by foce proportional to dist^2
-        let vela = [(tileA.size-tileB.size)/(tileA.size+tileB.size)*relativeVela[0]+(2*tileB.size)/((tileA.size+tileB.size))*relativeVelb[0],(tileA.size-tileB.size)/(tileA.size+tileB.size)*relativeVela[1]+(2*tileB.size)/((tileA.size+tileB.size))*relativeVelb[1]];
-        let velb = [(tileB.size-tileA.size)/(tileB.size+tileA.size)*relativeVelb[0]+(2*tileA.size)/((tileA.size+tileB.size))*relativeVela[0],(tileB.size-tileA.size)/(tileA.size+tileB.size)*relativeVelb[1]+(2*tileA.size)/((tileA.size+tileB.size))*relativeVela[1]];
-        tileA.velocityX += vela[0]-relativeVela[0];
-        tileA.velocityY += vela[1]-relativeVela[1];
-        tileB.velocityX += velb[0]-relativeVelb[0];
-        tileB.velocityY += velb[1]-relativeVelb[1];
-
-        //no need to immediatelly split them
-        let diff = tileA.radius+tileB.radius-dist;
-        tileA.x += normal[0]*diff/2;
-        tileA.y += normal[1]*diff/2;
-        tileB.x -= normal[0]*diff/2;
-        tileB.y -= normal[1]*diff/2;
+        tileA.velocityX += normal[0]*planc*500;
+        tileA.velocityY += normal[1]*planc*500;
+        tileB.velocityX -= normal[0]*planc*500;
+        tileB.velocityY -= normal[1]*planc*500;
     }
 }
 //start funcion, initialisation
 function start(){
     //loop
     types = ["red","blue","snow","sun","thorn"];
-    for(let i = 0; i < 100; i++){
-        tiles.push(new tile(Math.random()*(width-89),Math.random()*(height-91),types[Math.floor(i/20)]));
+    for(let i = 0; i < 10; i++){
+        tiles.push(new tile(Math.random()*(width-89),Math.random()*(height-91),types[Math.round(Math.random()*4)]));
     }
     setInterval(() => {
         update();
@@ -160,7 +186,13 @@ function update(){
         tilePrim[0].x = mouseX + tilePrim[1];
         tilePrim[0].y = mouseY + tilePrim[2];
     })
+    for(let i = 0; i < tiles.length;i++){
+        for(let j = 1; j < tiles.length-i;j++){
+            collision(tiles[i],tiles[i+j]);
+        }
+    }
     tiles.forEach(tile =>{
+        tile.update();
         tile.render();
     });
     
